@@ -22,6 +22,8 @@ import java.util.Locale;
  */
 
 public class Main {
+
+    public static final int LISTEN_PORT = 56789;
     private static final String KEY_FINGER_DOWN = "fingerdown";
     private static final String KEY_FINGER_UP = "fingerup";
     private static final String KEY_FINGER_MOVE = "fingermove";
@@ -36,14 +38,14 @@ public class Main {
         try {
             sEventInput = new EventInput();
         } catch (Exception e) {
-            System.out.print(e.getMessage());
+            System.out.print("EventInput error: " + e.getMessage());
             sEventInput = null;
         }
         AsyncHttpServer httpServer = new AsyncHttpServer();
         httpServer.get("/", new RequestHandler());
         httpServer.get("/screenshot.jpg", new RequestHandler());
         httpServer.websocket("/input", new InputHandler());
-        httpServer.listen(55000);
+        httpServer.listen(LISTEN_PORT);
         Looper.loop();
     }
 
@@ -56,8 +58,8 @@ public class Main {
                 public void onStringAvailable(String s) {
                     try {
                         JSONObject touch = new JSONObject(s);
-                        float x = Float.parseFloat(touch.getString("x"))*1.5f;
-                        float y = Float.parseFloat(touch.getString("y"))*1.5f;
+                        float x = Float.parseFloat(touch.getString("x"))*2;
+                        float y = Float.parseFloat(touch.getString("y"))*2;
                         String eventType = touch.getString(KEY_EVENT_TYPE);
                         switch (eventType) {
                             case KEY_FINGER_DOWN:
