@@ -23,7 +23,7 @@ import java.util.Locale;
 
 public class Main {
 
-    public static final int LISTEN_PORT = 56789;
+    private static final int LISTEN_PORT = 56789;
     private static final String KEY_FINGER_DOWN = "fingerdown";
     private static final String KEY_FINGER_UP = "fingerup";
     private static final String KEY_FINGER_MOVE = "fingermove";
@@ -42,7 +42,6 @@ public class Main {
             sEventInput = null;
         }
         AsyncHttpServer httpServer = new AsyncHttpServer();
-        httpServer.get("/", new RequestHandler());
         httpServer.get("/screenshot.jpg", new RequestHandler());
         httpServer.websocket("/input", new InputHandler());
         httpServer.listen(LISTEN_PORT);
@@ -58,8 +57,8 @@ public class Main {
                 public void onStringAvailable(String s) {
                     try {
                         JSONObject touch = new JSONObject(s);
-                        float x = Float.parseFloat(touch.getString("x"))*2;
-                        float y = Float.parseFloat(touch.getString("y"))*2;
+                        float x = Float.parseFloat(touch.getString("x"))*1.5f;
+                        float y = Float.parseFloat(touch.getString("y"))*1.5f;
                         String eventType = touch.getString(KEY_EVENT_TYPE);
                         switch (eventType) {
                             case KEY_FINGER_DOWN:
@@ -85,28 +84,23 @@ public class Main {
 
     private static class RequestHandler implements HttpServerRequestCallback {
         public void onRequest(AsyncHttpServerRequest request, AsyncHttpServerResponse response) {
-            String requestPath = request.getPath();
-            if (requestPath.endsWith(".jpg")) {
-                try {
-                    String surfaceClassName;
-                    if (Build.VERSION.SDK_INT <= 17) {
-                        surfaceClassName = "android.view.Surface";
-                    } else {
-                        surfaceClassName = "android.view.SurfaceControl";
-                    }
-                    Bitmap bitmap = (Bitmap) Class.forName(surfaceClassName)
-                            .getDeclaredMethod("screenshot", new Class[]{Integer.TYPE, Integer.TYPE})
-                            .invoke(null, sScreenWidth / 2, sScreenHeight / 2);
-                    ByteArrayOutputStream bout = new ByteArrayOutputStream();
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bout);
-                    bout.flush();
-                    response.send("image/jpeg", bout.toByteArray());
-                } catch (Exception e) {
-                    response.code(500);
-                    response.send(e.toString());
+            try {
+                String surfaceClassName;
+                if (Build.VERSION.SDK_INT <= 17) {
+                    surfaceClassName = "android.view.Surface";
+                } else {
+                    surfaceClassName = "android.view.SurfaceControl";
                 }
-            } else {
-                response.send("text/html", IndexPage.sHTML);
+                Bitmap bitmap = (Bitmap) Class.forName(surfaceClassName)
+                        .getDeclaredMethod("screenshot", new Class[]{Integer.TYPE, Integer.TYPE})
+                        .invoke(null, sScreenWidth / 2, sScreenHeight / 2);
+                ByteArrayOutputStream bout = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bout);
+                bout.flush();
+                response.send("image/jpeg", bout.toByteArray());
+            } catch (Exception e) {
+                response.code(500);
+                response.send(e.toString());
             }
         }
     }
