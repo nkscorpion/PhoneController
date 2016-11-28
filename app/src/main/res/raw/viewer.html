@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Android Controller</title>
+        <style>
+        #screen {
+            user-drag: none;
+            user-select: none;
+            -moz-user-select: none;
+            -webkit-user-drag: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+        }
+        </style>
+    </head>
+    <body>
+        <canvas id="screen" width="360" height="640" style="border:1px solid #d3d3d3;background:#ffffff;">
+			Your browser does not support the HTML5 canvas tag.
+		</canvas>
+    </body>
+    <script>
+    var screenFile = 'http://localhost:56789/screenshot.jpg?';
+    var ws = new WebSocket('ws://localhost:56789/input');
+    var screen = document.getElementById('screen');
+    var ctx = screen.getContext("2d");
+    var shouldSendMoveEvent = false;
+    ws.onmessage = function(event) {
+    	var blob  = new Blob([event.data], {type: "image/jpg"});
+  		var img = new Image();
+		img.onload = function (e) {
+			ctx.drawImage(img, 0, 0);
+			window.URL.revokeObjectURL(img.src);    
+			img = null;
+		};
+		img.onerror = img.onabort = function () {    
+			img = null;
+		};
+		img.src = window.URL.createObjectURL(blob);
+    };
+    ws.onclose = function(event) {
+    	window.close();
+    };
+    var down = function(event) {
+        shouldSendMoveEvent = true;
+        var x = event.pageX - screen.offsetLeft;
+        var y = event.pageY - screen.offsetTop;
+        var eventjson = '{"type":"fingerdown","x":'+x+',"y":'+y+'}';
+        ws.send(eventjson);
+    }
+    var up = function(event) {
+        var x = event.pageX - screen.offsetLeft;
+        var y = event.pageY - screen.offsetTop;
+        var eventjson = '{"type":"fingerup","x":'+x+',"y":'+y+'}';
+        ws.send(eventjson);
+        shouldSendMoveEvent = false;
+    }
+    var move = function(event) {
+        if (shouldSendMoveEvent) {
+            var x = event.pageX - screen.offsetLeft;
+            var y = event.pageY - screen.offsetTop;
+            var eventjson = '{"type":"fingermove","x":'+x+',"y":'+y+'}';
+            ws.send(eventjson);
+        }
+    }
+    var updateScreen = function() {
+        screen.src = screenFile + new Date().getTime();
+    }
+    screen.addEventListener('mousedown', down, false);
+    screen.addEventListener('mouseup', up, false);
+    screen.addEventListener('mousemove', move, false);
+    </script>
+</html>
