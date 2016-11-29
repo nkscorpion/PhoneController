@@ -4,17 +4,18 @@
         <title>Android Controller</title>
         <style>
         #screen {
-            user-drag: none;
-            user-select: none;
-            -moz-user-select: none;
-            -webkit-user-drag: none;
-            -webkit-user-select: none;
-            -ms-user-select: none;
+        	border:1px solid #d3d3d3;
+        	background:#ffffff;
+        	position: absolute; 
+    		left: 50%;
+    		width: 360px;
+    		height: 640px;
+    		margin: 0 0 0 -180px;
         }
         </style>
     </head>
     <body>
-        <canvas id="screen" width="360" height="640" style="border:1px solid #d3d3d3;background:#ffffff;">
+        <canvas id="screen" width="360px" height="640px">
 			Your browser does not support the HTML5 canvas tag.
 		</canvas>
     </body>
@@ -62,11 +63,12 @@
             ws.send(eventjson);
         }
     }
-    var updateScreen = function() {
-        screen.src = screenFile + new Date().getTime();
+    var heartbeat = function() {
+    	ws.send('{"type":"beatheart"}');
     }
     screen.addEventListener('mousedown', down, false);
     screen.addEventListener('mouseup', up, false);
     screen.addEventListener('mousemove', move, false);
+    setInterval("heartbeat()", 2000);
     </script>
 </html>

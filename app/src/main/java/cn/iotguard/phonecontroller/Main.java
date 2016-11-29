@@ -36,7 +36,7 @@ public class Main {
     private static Method sInjectInputEventMethod;
     private static final int PICTURE_WIDTH = 360;
     private static final int PICTURE_HEIGHT = 640;
-    private static final float PICTURE_SCALE = 1.5f;
+    private static final float PICTURE_SCALE = 2f;
     private static Thread sSendImageThread;
     private static Timer sTimer;
     private static boolean sViewerIsAlive;
