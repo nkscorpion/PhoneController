@@ -9,7 +9,6 @@ import android.support.v4.view.InputDeviceCompat;
 import android.view.InputEvent;
 import android.view.MotionEvent;
 
-import com.koushikdutta.async.callback.CompletedCallback;
 import com.koushikdutta.async.http.WebSocket;
 import com.koushikdutta.async.http.server.AsyncHttpServer;
 import com.koushikdutta.async.http.server.AsyncHttpServerRequest;
@@ -18,7 +17,8 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Method;
-import java.util.Locale;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Created by caowentao on 2016/11/23.
@@ -30,17 +30,22 @@ public class Main {
     private static final String KEY_FINGER_DOWN = "fingerdown";
     private static final String KEY_FINGER_UP = "fingerup";
     private static final String KEY_FINGER_MOVE = "fingermove";
+    private static final String KEY_BEATHEART = "beatheart";
     private static final String KEY_EVENT_TYPE = "type";
     private static InputManager sInputManager;
     private static Method sInjectInputEventMethod;
-    private static int sScreenWidth = 720;
-    private static int sScreenHeight = 1280;
+    private static final int PICTURE_WIDTH = 360;
+    private static final int PICTURE_HEIGHT = 640;
+    private static final float PICTURE_SCALE = 1.5f;
     private static Thread sSendImageThread;
+    private static Timer sTimer;
+    private static boolean sViewerIsAlive;
+    private static boolean sThreadKeepRunning;
 
     public static void main(String[] args) {
         Looper.prepare();
-        System.out.println(String.format(Locale.CHINA,
-                "PhoneController start...%dx%d", sScreenWidth, sScreenHeight));
+        System.out.println("PhoneController start...");
+        sTimer = new Timer();
         try {
             sInputManager = (InputManager) InputManager.class.getDeclaredMethod("getInstance").invoke(null);
             sInjectInputEventMethod = InputManager.class.getMethod("injectInputEvent", InputEvent.class, Integer.TYPE);
@@ -58,45 +63,37 @@ public class Main {
         public void onConnected(WebSocket webSocket, AsyncHttpServerRequest request) {
             System.out.println("websocket connected.");
             if (sSendImageThread == null) {
+                sThreadKeepRunning = true;
                 sSendImageThread = new Thread(new SendScreenShotThread((webSocket)));
                 sSendImageThread.start();
-
-                webSocket.setClosedCallback(new CompletedCallback() {
-                    @Override
-                    public void onCompleted(Exception ex) {
-                        System.out.println("page closed : " + ex.getMessage());
-                        sSendImageThread.interrupt();
-                    }
-                });
-
-                webSocket.setEndCallback(new CompletedCallback() {
-                    @Override
-                    public void onCompleted(Exception ex) {
-                        System.out.println("page closed : " + ex.getMessage());
-                        sSendImageThread.interrupt();
-                    }
-                });
-
+                sTimer.schedule(new SendScreenShotThreadWatchDog(), 5000, 5000);
                 webSocket.setStringCallback(new WebSocket.StringCallback() {
                     @Override
                     public void onStringAvailable(String s) {
                         try {
-                            JSONObject touch = new JSONObject(s);
-                            float x = Float.parseFloat(touch.getString("x"))*1.5f;
-                            float y = Float.parseFloat(touch.getString("y"))*1.5f;
-                            String eventType = touch.getString(KEY_EVENT_TYPE);
+                            JSONObject event = new JSONObject(s);
+                            String eventType = event.getString(KEY_EVENT_TYPE);
                             switch (eventType) {
                                 case KEY_FINGER_DOWN:
+                                    float x = Float.parseFloat(event.getString("x")) * PICTURE_SCALE;
+                                    float y = Float.parseFloat(event.getString("y")) * PICTURE_SCALE;
                                     injectMotionEvent(InputDeviceCompat.SOURCE_TOUCHSCREEN, 0,
                                             SystemClock.uptimeMillis(), x, y, 1.0f);
                                     break;
                                 case KEY_FINGER_UP:
+                                    x = Float.parseFloat(event.getString("x")) * PICTURE_SCALE;
+                                    y = Float.parseFloat(event.getString("y")) * PICTURE_SCALE;
                                     injectMotionEvent(InputDeviceCompat.SOURCE_TOUCHSCREEN, 1,
                                             SystemClock.uptimeMillis(), x, y, 1.0f);
                                     break;
                                 case KEY_FINGER_MOVE:
+                                    x = Float.parseFloat(event.getString("x")) * PICTURE_SCALE;
+                                    y = Float.parseFloat(event.getString("y")) * PICTURE_SCALE;
                                     injectMotionEvent(InputDeviceCompat.SOURCE_TOUCHSCREEN, 2,
                                             SystemClock.uptimeMillis(), x, y, 1.0f);
+                                    break;
+                                case KEY_BEATHEART:
+                                    sViewerIsAlive = true;
                                     break;
                             }
                         } catch (Exception e) {
@@ -106,6 +103,21 @@ public class Main {
                 });
             } else {
                 webSocket.close();
+            }
+        }
+    }
+
+    private static class SendScreenShotThreadWatchDog extends TimerTask {
+        @Override
+        public void run() {
+            if (sViewerIsAlive) {
+                sViewerIsAlive = false;
+            } else if (sSendImageThread != null) {
+                System.out.println("exit thread");
+                sThreadKeepRunning = false;
+                sSendImageThread = null;
+                cancel();
+                sTimer.purge();
             }
         }
     }
@@ -124,11 +136,11 @@ public class Main {
         }
         @Override
         public void run() {
-            while (!Thread.currentThread().isInterrupted()) {
+            while (sThreadKeepRunning) {
                 try {
                     Bitmap bitmap = (Bitmap) Class.forName(mSurfaceName)
                             .getDeclaredMethod("screenshot", new Class[]{Integer.TYPE, Integer.TYPE})
-                            .invoke(null, sScreenWidth / 2, sScreenHeight / 2);
+                            .invoke(null, PICTURE_WIDTH, PICTURE_HEIGHT);
                     ByteArrayOutputStream bout = new ByteArrayOutputStream();
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bout);
                     bout.flush();
@@ -138,6 +150,7 @@ public class Main {
                     break;
                 }
             }
+            mWebSocket.close();
         }
     }
 
