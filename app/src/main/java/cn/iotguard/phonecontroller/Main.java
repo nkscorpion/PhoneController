@@ -1,6 +1,7 @@
 package cn.iotguard.phonecontroller;
 
 import android.graphics.Bitmap;
+import android.graphics.Matrix;
 import android.hardware.input.InputManager;
 import android.os.Build;
 import android.os.Looper;
@@ -30,13 +31,17 @@ public class Main {
     private static final String KEY_FINGER_DOWN = "fingerdown";
     private static final String KEY_FINGER_UP = "fingerup";
     private static final String KEY_FINGER_MOVE = "fingermove";
+    private static final String KEY_CHANGE_SIZE = "change_size";
+    private static final String KEY_ROTATE = "rotate";
     private static final String KEY_BEATHEART = "beatheart";
     private static final String KEY_EVENT_TYPE = "type";
     private static InputManager sInputManager;
     private static Method sInjectInputEventMethod;
-    private static final int PICTURE_WIDTH = 360;
-    private static final int PICTURE_HEIGHT = 640;
-    private static final float PICTURE_SCALE = 2f;
+    private static final float BASE_WIDTH = 720;
+    private static final float BASE_HEIGHT = 1280;
+    private static int sPictureWidth = 360;
+    private static int sPictureHeight = 640;
+    private static int sRotate = 0;
     private static Thread sSendImageThread;
     private static Timer sTimer;
     private static boolean sViewerIsAlive;
@@ -75,25 +80,33 @@ public class Main {
                             String eventType = event.getString(KEY_EVENT_TYPE);
                             switch (eventType) {
                                 case KEY_FINGER_DOWN:
-                                    float x = Float.parseFloat(event.getString("x")) * PICTURE_SCALE;
-                                    float y = Float.parseFloat(event.getString("y")) * PICTURE_SCALE;
+                                    float x = Float.parseFloat(event.getString("x")) * (BASE_WIDTH / sPictureWidth);
+                                    float y = Float.parseFloat(event.getString("y")) * (BASE_WIDTH / sPictureWidth);
                                     injectMotionEvent(InputDeviceCompat.SOURCE_TOUCHSCREEN, 0,
                                             SystemClock.uptimeMillis(), x, y, 1.0f);
                                     break;
                                 case KEY_FINGER_UP:
-                                    x = Float.parseFloat(event.getString("x")) * PICTURE_SCALE;
-                                    y = Float.parseFloat(event.getString("y")) * PICTURE_SCALE;
+                                    x = Float.parseFloat(event.getString("x")) * (BASE_WIDTH / sPictureWidth);
+                                    y = Float.parseFloat(event.getString("y")) * (BASE_WIDTH / sPictureWidth);
                                     injectMotionEvent(InputDeviceCompat.SOURCE_TOUCHSCREEN, 1,
                                             SystemClock.uptimeMillis(), x, y, 1.0f);
                                     break;
                                 case KEY_FINGER_MOVE:
-                                    x = Float.parseFloat(event.getString("x")) * PICTURE_SCALE;
-                                    y = Float.parseFloat(event.getString("y")) * PICTURE_SCALE;
+                                    x = Float.parseFloat(event.getString("x")) * (BASE_WIDTH / sPictureWidth);
+                                    y = Float.parseFloat(event.getString("y")) * (BASE_WIDTH / sPictureWidth);
                                     injectMotionEvent(InputDeviceCompat.SOURCE_TOUCHSCREEN, 2,
                                             SystemClock.uptimeMillis(), x, y, 1.0f);
                                     break;
                                 case KEY_BEATHEART:
                                     sViewerIsAlive = true;
+                                    break;
+                                case KEY_CHANGE_SIZE:
+                                    sPictureWidth = Integer.parseInt(event.getString("w"));
+                                    sPictureHeight = Integer.parseInt(event.getString("h"));
+                                    break;
+                                case KEY_ROTATE:
+                                    if (sRotate == 270) sRotate = 0;
+                                    else sRotate += 90;
                                     break;
                             }
                         } catch (Exception e) {
@@ -140,7 +153,10 @@ public class Main {
                 try {
                     Bitmap bitmap = (Bitmap) Class.forName(mSurfaceName)
                             .getDeclaredMethod("screenshot", new Class[]{Integer.TYPE, Integer.TYPE})
-                            .invoke(null, PICTURE_WIDTH, PICTURE_HEIGHT);
+                            .invoke(null, sPictureWidth, sPictureHeight);
+                    Matrix matrix = new Matrix();
+                    matrix.setRotate(sRotate);
+                    bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, false);
                     ByteArrayOutputStream bout = new ByteArrayOutputStream();
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bout);
                     bout.flush();
