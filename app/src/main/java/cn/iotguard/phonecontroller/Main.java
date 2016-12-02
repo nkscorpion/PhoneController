@@ -32,7 +32,6 @@ public class Main {
     private static final String KEY_FINGER_UP = "fingerup";
     private static final String KEY_FINGER_MOVE = "fingermove";
     private static final String KEY_CHANGE_SIZE = "change_size";
-    private static final String KEY_ROTATE = "rotate";
     private static final String KEY_BEATHEART = "beatheart";
     private static final String KEY_EVENT_TYPE = "type";
     private static InputManager sInputManager;
@@ -80,20 +79,20 @@ public class Main {
                             String eventType = event.getString(KEY_EVENT_TYPE);
                             switch (eventType) {
                                 case KEY_FINGER_DOWN:
-                                    float x = Float.parseFloat(event.getString("x")) * (BASE_WIDTH / sPictureWidth);
-                                    float y = Float.parseFloat(event.getString("y")) * (BASE_WIDTH / sPictureWidth);
+                                    float x = event.getInt("x") * (BASE_WIDTH / sPictureWidth);
+                                    float y = event.getInt("y") * (BASE_WIDTH / sPictureWidth);
                                     injectMotionEvent(InputDeviceCompat.SOURCE_TOUCHSCREEN, 0,
                                             SystemClock.uptimeMillis(), x, y, 1.0f);
                                     break;
                                 case KEY_FINGER_UP:
-                                    x = Float.parseFloat(event.getString("x")) * (BASE_WIDTH / sPictureWidth);
-                                    y = Float.parseFloat(event.getString("y")) * (BASE_WIDTH / sPictureWidth);
+                                    x = event.getInt("x") * (BASE_WIDTH / sPictureWidth);
+                                    y = event.getInt("y") * (BASE_WIDTH / sPictureWidth);
                                     injectMotionEvent(InputDeviceCompat.SOURCE_TOUCHSCREEN, 1,
                                             SystemClock.uptimeMillis(), x, y, 1.0f);
                                     break;
                                 case KEY_FINGER_MOVE:
-                                    x = Float.parseFloat(event.getString("x")) * (BASE_WIDTH / sPictureWidth);
-                                    y = Float.parseFloat(event.getString("y")) * (BASE_WIDTH / sPictureWidth);
+                                    x = event.getInt("x") * (BASE_WIDTH / sPictureWidth);
+                                    y = event.getInt("y") * (BASE_WIDTH / sPictureWidth);
                                     injectMotionEvent(InputDeviceCompat.SOURCE_TOUCHSCREEN, 2,
                                             SystemClock.uptimeMillis(), x, y, 1.0f);
                                     break;
@@ -101,12 +100,9 @@ public class Main {
                                     sViewerIsAlive = true;
                                     break;
                                 case KEY_CHANGE_SIZE:
-                                    sPictureWidth = Integer.parseInt(event.getString("w"));
-                                    sPictureHeight = Integer.parseInt(event.getString("h"));
-                                    break;
-                                case KEY_ROTATE:
-                                    if (sRotate == 270) sRotate = 0;
-                                    else sRotate += 90;
+                                    sPictureWidth = event.getInt("w");
+                                    sPictureHeight = event.getInt("h");
+                                    sRotate = event.getInt("r");
                                     break;
                             }
                         } catch (Exception e) {
@@ -156,9 +152,9 @@ public class Main {
                             .invoke(null, sPictureWidth, sPictureHeight);
                     Matrix matrix = new Matrix();
                     matrix.setRotate(sRotate);
-                    bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, false);
+                    Bitmap resultBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, false);
                     ByteArrayOutputStream bout = new ByteArrayOutputStream();
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bout);
+                    resultBitmap.compress(Bitmap.CompressFormat.JPEG, 100, bout);
                     bout.flush();
                     mWebSocket.send(bout.toByteArray());
                 } catch (Exception e) {

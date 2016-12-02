@@ -7,16 +7,22 @@
     	<button id="big">720X1280</button>
     	<button id="small">360X640</button>
     	<button id="rotate">旋转</button><br />
-        <canvas id="screen" width="1280px" height="1280px">
+        <canvas id="screen">
 			Your browser does not support the HTML5 canvas tag.
 		</canvas>
     </body>
     <script>
     var screenFile = 'http://localhost:56789/screenshot.jpg?';
     var ws = new WebSocket('ws://localhost:56789/input');
+    var initScreenWidth = 1280;
+    var initScreenHeight = 720;
+    var initRotate = 90;
     var screen = document.getElementById('screen');
     var ctx = screen.getContext("2d");
     var shouldSendMoveEvent = false;
+    ws.onopen = function(event) {
+    	resizePicture();
+    };
     ws.onmessage = function(event) {
     	var blob  = new Blob([event.data], {type: "image/jpg"});
   		var img = new Image();
@@ -35,48 +41,92 @@
     };
     var down = function(event) {
         shouldSendMoveEvent = true;
-        var x = event.pageX - screen.offsetLeft;
-        var y = event.pageY - screen.offsetTop;
-        var eventjson = '{"type":"fingerdown","x":'+x+',"y":'+y+'}';
-        ws.send(eventjson);
-    }
+        sendFingerPosition("fingerdown", event);
+    };
     var up = function(event) {
-        var x = event.pageX - screen.offsetLeft;
-        var y = event.pageY - screen.offsetTop;
-        var eventjson = '{"type":"fingerup","x":'+x+',"y":'+y+'}';
-        ws.send(eventjson);
+    	sendFingerPosition("fingerup", event)
         shouldSendMoveEvent = false;
-    }
+    };
     var move = function(event) {
         if (shouldSendMoveEvent) {
-            var x = event.pageX - screen.offsetLeft;
-            var y = event.pageY - screen.offsetTop;
-            var eventjson = '{"type":"fingermove","x":'+x+',"y":'+y+'}';
-            ws.send(eventjson);
+        	sendFingerPosition("fingermove", event);
         }
-    }
+    };
+    var sendFingerPosition = function(type, event) {
+    	var x = event.pageX - screen.offsetLeft;
+        var y = event.pageY - screen.offsetTop;
+        var lastX = x;
+        var lastY = y;
+        if (initRotate == 90) {
+        	lastX = y;
+        	lastY = initScreenWidth - x;
+        } else if (initRotate == 180) {
+        	lastX = initScreenWidth - x;
+        	lastY = initScreenHeight - y;
+        } else if (initRotate == 270) {
+        	lastX = initScreenHeight - y;
+        	lastY = x;
+        }
+        var eventjson = '{"type":"'+type+'","x":'+lastX+',"y":'+lastY+'}';
+        ws.send(eventjson);
+    };
     var heartbeat = function() {
     	ws.send('{"type":"beatheart"}');
-    }
+    };
 
-    var clearCanvas = function() {
-    	ctx.clearRect(0, 0, screen.width, screen.height);
-    }
+    var resizeCanvas = function() {
+    	screen.width = initScreenWidth;
+    	screen.height = initScreenHeight;
+    };
+
+    var resizePicture = function() {
+    	if (initScreenWidth <= initScreenHeight) {
+    		ws.send('{"type":"change_size", "w":'+initScreenWidth+', "h":'+initScreenHeight+', "r":'+ initRotate+'}');					
+    	} else {
+    		ws.send('{"type":"change_size", "w":'+initScreenHeight+', "h":'+initScreenWidth+', "r":'+ initRotate+'}');
+    	}
+    };
 
     var buttonHandler = function(e) {
     	switch(e.target.id) {
     		case "big":
-    			ws.send('{"type":"change_size", "w":720, "h":1280}');
+    			if (Math.abs(initScreenWidth - initScreenHeight) == 280) {
+    				if (initRotate == 90 || initRotate == 270) {
+    					initScreenWidth = 1280;
+    					initScreenHeight = 720;
+    				} else {
+    					initScreenWidth = 720;
+    					initScreenHeight = 1280;
+    				}
+    				resizePicture();
+    				resizeCanvas();
+    			}
     			break;
     		case "small":
-    			ws.send('{"type":"change_size", "w":360, "h":640}');
+    			if (Math.abs(initScreenWidth - initScreenHeight) == 560) {
+    				if (initRotate == 90 || initRotate == 270) {
+    					initScreenWidth = 640;
+    					initScreenHeight = 360;
+    				} else {
+    					initScreenWidth = 360;
+    					initScreenHeight = 640;
+    				}
+    				resizePicture();
+    				resizeCanvas();
+    			}
     			break;
     		case "rotate":
-    			ws.send('{"type":"rotate"}');
-    		break;
+    			if (initRotate == 270) initRotate = 0;
+    			else initRotate += 90;
+    			var temp = initScreenHeight;
+    			initScreenHeight = initScreenWidth;
+    			initScreenWidth = temp;
+    			resizePicture();
+    			resizeCanvas();
+    			break;
     	}
-    	setTimeout("clearCanvas()", 300);
-    }
+    };
+    resizeCanvas();
     screen.addEventListener('mousedown', down, false);
     screen.addEventListener('mouseup', up, false);
     screen.addEventListener('mousemove', move, false);
